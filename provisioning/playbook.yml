@@ -1,0 +1,43 @@
+- hosts: all
+  vars_files:
+    - vars/secrets.yml
+  roles:
+    - { role: geerlingguy.postfix }
+
+  tasks:
+    - name: Install mailutils
+      apt:
+        name: mailutils
+        state: present
+    - name: Add relayhost
+      lineinfile:
+        path: /etc/postfix/main.cf
+        regexp: ^relayhost
+        line: relayhost = [smtp.sparkpostmail.com]:587
+    - name: Add postfix config
+      blockinfile:
+        path: /etc/postfix/main.cf
+        block: |
+          smtp_sasl_auth_enable = yes
+          smtp_sasl_password_maps = static:SMTP_Injection:{{sparkpost_api_key}}
+          smtp_sasl_security_options = noanonymous
+          smtp_tls_security_level = encrypt
+          header_size_limit = 4096000
+          smtp_generic_maps = hash:/etc/postfix/generic
+    - name: Add postfix map
+      lineinfile:
+        path: /etc/postfix/generic
+        create: yes
+        regexp: ^root noreply
+        line: root noreply@e-o.no
+      notify:
+        - "do postmap mapping"
+  handlers:
+    - name: restart postfix
+      service:
+        name: postfix
+        state: restarted
+      listen: "do postmap mapping"
+    - name: postmap mapping
+      command: postmap /etc/postfix/generic
+      listen: "do postmap mapping"
