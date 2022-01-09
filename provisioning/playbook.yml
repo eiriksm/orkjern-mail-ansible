@@ -32,6 +32,23 @@
         line: root noreply@e-o.no
       notify:
         - "do postmap mapping"
+    - name: Add postfix map
+      lineinfile:
+        path: /etc/postfix/generic
+        create: yes
+        regexp: ^{{maint_user}} noreply
+        line: "{{maint_user}} noreply@e-o.no"
+      notify:
+        - "do postmap mapping"
+    - name: Add postfix map
+      lineinfile:
+        path: /etc/postfix/generic
+        create: yes
+        regexp: ^{{deploy_user}} noreply
+        line: "{{deploy_user}} noreply@e-o.no"
+      notify:
+        - "do postmap mapping"
+
   handlers:
     - name: restart postfix
       service:
