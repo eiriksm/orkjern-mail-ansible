@@ -7,19 +7,20 @@
   tasks:
     - name: Install mailutils
       apt:
-        name: mailutils
-        state: present
+        pkg:
+          - mailutils
+          - libsasl2-modules
     - name: Add relayhost
       lineinfile:
         path: /etc/postfix/main.cf
         regexp: ^relayhost
-        line: relayhost = [smtp.sparkpostmail.com]:587
+        line: relayhost = [{{ AWS_SES_SMTP_REGION }}]:587
     - name: Add postfix config
       blockinfile:
         path: /etc/postfix/main.cf
         block: |
           smtp_sasl_auth_enable = yes
-          smtp_sasl_password_maps = static:SMTP_Injection:{{sparkpost_api_key}}
+          smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
           smtp_sasl_security_options = noanonymous
           smtp_tls_security_level = encrypt
           header_size_limit = 4096000
@@ -48,6 +49,21 @@
         line: "{{deploy_user}} noreply@e-o.no"
       notify:
         - "do postmap mapping"
+    - name: Create sasl for SES
+      template:
+        src: ./templates/sasl_passwd.j2
+        dest: /etc/postfix/sasl_passwd
+        owner: root
+        group: root
+        mode: 0600
+      notify:
+        - hash sasl
+    - name: Change file ownership, group and permissions
+      ansible.builtin.file:
+        path: /etc/postfix/sasl_passwd.db
+        owner: root
+        group: root
+        mode: '0600'
 
   handlers:
     - name: restart postfix
@@ -58,3 +74,7 @@
     - name: postmap mapping
       command: postmap /etc/postfix/generic
       listen: "do postmap mapping"
+    - name: hash sasl
+      command: postmap hash:/etc/postfix/sasl_passwd
+      notify:
+        - restart postfix
